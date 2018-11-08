@@ -48,7 +48,8 @@ def get_series_data_from_tweet(tweet, window_size=40, step=3):
 
 
 def get_unique_chars_list(list_strings):
-    """ takes list of strings, returns dict of all characters """
+    """ takes list of strings, returns dict of all characters 
+    ***** REMEMBER ***** to modify this code for multiple tweets """
 
     one_big_string = ' '.join(list_strings)
 
