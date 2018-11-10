@@ -40,15 +40,18 @@ def get_series_data_from_tweet(tweet, window_size=40, step=3):
     next_chars = []
     tweet_length = len(tweet['text'])
 
-    for i in range(0, tweet_length - window_size, step):
-        sentences.append(tweet['text'][i:i+window_size])
-        next_chars.append(tweet['text'][i+window_size])
+    # pad all tweets to 160 characters
+    padded_text = ' ' * (160-tweet_length) + tweet['text']
+
+    for i in range(0, 160 - window_size, step):
+        sentences.append(padded_text[i:i+window_size])
+        next_chars.append(padded_text[i+window_size])
 
     return (sentences, next_chars)
 
 
 def get_unique_chars_list(list_strings):
-    """ takes list of strings, returns dict of all characters 
+    """ takes list of strings, returns dict of all characters
     ***** REMEMBER ***** to modify this code for multiple tweets """
 
     one_big_string = ' '.join(list_strings)
@@ -62,8 +65,10 @@ def get_unique_chars_list(list_strings):
 
 def get_x_y_bool_arrays(sentences, next_chars):
     """ takes the list of strings (sentences) and list of next_chars, and
-    one-hot encodes them using Boolean type, returns as arrays of x, y """
-
+    one-hot encodes them using Boolean type, returns as arrays of x, y.
+    Now replaced by get_x_bool_array and get_y_bool_array as vectorisable versions
+    that work over a pd.Series"""
+    print("Deprecated! Use get_x_bool_array or get_y_bool_array instead")
     chars, char_index = get_unique_chars_list(sentences)
 
     text_x = np.zeros((len(sentences), len(sentences[0]),
@@ -75,6 +80,49 @@ def get_x_y_bool_arrays(sentences, next_chars):
         text_y[i, char_index[next_chars[i]]] = 1
 
     return (text_x, text_y)
+
+
+def get_universal_chars_list():
+    """ gets a universal set of text characters and basic punctuation, suitable for using
+    on all tweets. returns set of characters and the index. """
+
+    return get_unique_chars_list(
+        """ '",.<>£$%^&*()-=\\/?_+@~#`ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz""")
+
+
+def get_x_bool_array(sentence, chars, char_index):
+    """ similar to get_x_y_bool_arrays() but operates on a single
+    sentence and returns a one-hot encoded bool array (dims len(sentence) x len(chars)).
+    Series chars is a list of recognised characters and char_index is the corresponding index"""
+
+    # chars, char_index = get_unique_chars_list(sentence)
+
+    text_x = np.zeros((len(sentence), len(sentence[0]),
+                       len(chars)), dtype=np.bool)
+    # text_y = np.zeros((len(sentences), len(char_index)), dtype=np.bool)
+    for i, s in enumerate(sentence):
+        for pos, char in enumerate(s):
+            text_x[i, pos, char_index[char]] = 1
+        # text_y[i, char_index[next_chars[i]]] = 1
+
+    return np.asarray(text_x)
+
+
+def get_y_bool_array(next_chars, chars, char_index):
+    """ similar to get_x_y_bool_arrays() but operates on a single
+    sentence and returns a one-hot encoded bool array only (one dimension of size len(chars)).
+    Series chars is a list of recognised characters and char_index is the corresponding index"""
+
+    # Pass in a global list/index of characters so it's the same encoding for all tweets
+    # chars, char_index = get_unique_chars_list(sentence)
+
+    # text_x = np.zeros((len(sentence), len(sentence[0]),
+    #                   len(chars)), dtype=np.bool)
+    text_y = np.zeros((len(next_chars), len(char_index)), dtype=np.bool)
+    for i in range(len(next_chars)):
+        text_y[i, char_index[next_chars[i]]] = 1
+
+    return np.asarray(text_y)
 
 
 def x_y_bool_array_to_sentence(text_x, text_y, chars, position=0):
