@@ -83,6 +83,11 @@ def test_one_hot_encoding_with_separate_functions_decodes():
         reconverted = util.x_y_bool_array_to_sentence(x, y, chars, i)
         assert reconverted == util.pad_text(my_dict['text'], length=160)[(i*stp):(i*stp)+window+1]
 
+    # test that the optional separator works
+    reconverted = util.x_y_bool_array_to_sentence(x, y, chars, i, separator=True)
+    original = util.pad_text(my_dict['text'], length=160)[(i*stp):(i*stp)+window+1]
+    assert reconverted == original[0:-1] + ':' + original[-1]
+
 
 def test_pad_text_returns_160():
     """ tests pad_text() returns exactly the expected number of characters """

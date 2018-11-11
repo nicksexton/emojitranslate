@@ -50,11 +50,6 @@ def pad_text(text, length=160):
     return padded_text
 
 
-def filter_text(text):
-    """ a wrapper for the previous filtering functions"""
-    return filter_text_for_chars(filter_text_for_handles(text))
-
-
 def get_series_data_from_tweet(tweet, length=160, window_size=40, step=3):
     """ input (tweet) is a pd.Series, a row of a pd.DataFrame
     returns corresponding lists sentences (of length window_size)
@@ -147,7 +142,7 @@ def get_y_bool_array(next_chars, char_index):
     return np.asarray(text_y)
 
 
-def x_y_bool_array_to_sentence(text_x, text_y, chars, position=0):
+def x_y_bool_array_to_sentence(text_x, text_y, chars, position=0, separator=False):
     """ converts one-hot encoded arrays text_x, text_y back to human
     readable, for debug purposes """
 
@@ -162,8 +157,12 @@ def x_y_bool_array_to_sentence(text_x, text_y, chars, position=0):
 
     def decode_example(text_x, text_y):
         # decodes x, y from array type back into english
+        if separator:
+            sep = ':'
+        else:
+            sep = ''
         return(''.join(decode_line(text_x, chars)) +  # decode x
-               bool_array_to_char(text_y, chars))   # decode y
+               sep + bool_array_to_char(text_y, chars))   # decode y
 
     return decode_example(text_x[position], text_y[position])
 
