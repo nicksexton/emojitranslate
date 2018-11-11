@@ -7,19 +7,23 @@ import data_load_utils as util
 
 
 def test_filter_text_for_handles_does_what_it_says():
+    """ check filters both handles and chars """
     sample_series = pd.Series(
         ['some text with a @handle',
-         'more @text with handle'],
+         'more @text with handle',
+         'I`m an undesirable character'],
         name='text')
 
     compare_series = pd.Series(
         ['some text with a',
-         'more with handle'],
+         'more with handle',
+         'Im an undesirable character'],
         name='text')
 
     filtered_series = util.filter_text_for_handles(sample_series)
-    assert filtered_series[0] == compare_series[0]
-    assert filtered_series[1] == compare_series[1]
+    assert filtered_series[0] == compare_series[0]  # handles
+    assert filtered_series[1] == compare_series[1]  # handles
+    assert filtered_series[2] == compare_series[2]  # characters
     return
 
 

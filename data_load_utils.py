@@ -2,6 +2,7 @@
 
 
 import os
+import string
 import pandas as pd
 import numpy as np
 import emoji
@@ -14,7 +15,7 @@ def read_tweet_data(path):
     """" loads the csv (path) containing text and emoji data
     returns a pandas dataframe containing line number, text, and emoji """
     data = pd.read_csv(path)
-    data = pd.loc[:, ['text', 'emoji']]  # should contain two labelled columns
+    data = data.loc[:, ['text', 'emoji']]  # should contain two labelled columns
     return data
 
 
@@ -24,14 +25,19 @@ def filter_tweets_min_count(tweets, min_count=1000):
     return tweets.groupby('emoji').filter(lambda c: len(c) > min_count)
 
 
-def filter_text_for_handles(text):
+def filter_text_for_handles(text, chars=CHARACTERS):
     """ takes an pd.Series of text, removes twitter handles from
-    text data - all text preceded by @ """
+    text data - all text preceded by @ and then all characters not contained in 
+    universal set"""
 
     def filter_handles(txt): return ' '.join(
         word for word in txt.split(' ') if not word.startswith('@'))
 
-    return text.apply(filter_handles)
+    def filter_chars(txt): return ''.join([c for c in txt if c in chars])
+
+    def filter(txt): return filter_chars(filter_handles(txt))
+
+    return text.apply(filter)
 
 
 def pad_text(text, length=160):
@@ -42,6 +48,11 @@ def pad_text(text, length=160):
 
     padded_text = ' ' * (length - len(text)) + text
     return padded_text
+
+
+def filter_text(text):
+    """ a wrapper for the previous filtering functions"""
+    return filter_text_for_chars(filter_text_for_handles(text))
 
 
 def get_series_data_from_tweet(tweet, length=160, window_size=40, step=3):
