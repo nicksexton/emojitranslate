@@ -5,7 +5,7 @@ import os
 import string
 import pandas as pd
 import numpy as np
-import emoji
+# import emoji
 
 
 CHARACTERS = """ '",.\\/|?:;@'~#[]{}-=_+!"£$%^&*()abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890"""
@@ -212,6 +212,9 @@ def convert_tweet_to_xy(tweet, length=160, window_size=40, step=3):
     for i, nchar in enumerate(y_bool):
         y_arr[i] = nchar
 
+    # temp for profiling
+    del x_bool, y_bool
+
     # finally, reshape into a (m, w, c) array
     # where m is training example, w is window size,
     # c is one-hot encoded character
@@ -219,5 +222,8 @@ def convert_tweet_to_xy(tweet, length=160, window_size=40, step=3):
 
     # y is a (m, c) array, where m is training example and c is one-hot encoded character
     y_fin = y_arr.reshape(y_arr.shape[0] * y_arr.shape[1], y_arr.shape[2])
+
+    # temp
+    del x_arr, y_arr
 
     return x_fin, y_fin
