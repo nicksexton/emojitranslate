@@ -110,24 +110,75 @@ def test_convert_tweet_to_xy():
                [":rainbow:",
                 ":gay_pride_flag:"]}
 
-    truncate_length = 160
+    truncate_length = [90, 135, 160, 200]  # 160
     window_size = [10, 37, 40, 55]
-    step = 3
+    step = [2, 3, 5, 7]  # 3
     chars, _ = util.get_universal_chars_list()
 
-    for w in window_size:
-        my_data = pd.DataFrame(my_dict)
-        x, y = util.convert_tweet_to_xy(my_data,
-                                        length=truncate_length,
-                                        window_size=w)
+    for t in truncate_length:
+        for w in window_size:
+            for s in step:
 
-        # check dimensions are as expected
-        assert x.shape[1] == w  # indexes over position in the window
-        assert x.shape[2] == len(chars)  # indexes over one-hot encoding
-        assert y.shape[0] == x.shape[0]
-        assert y.shape[1] == len(chars)
+                my_data = pd.DataFrame(my_dict)
+                x, y = util.convert_tweet_to_xy(my_data,
+                                                length=t,
+                                                window_size=w,
+                                                step=s)
 
-        # check one-hot encoding decodes again
-        for i in range(5):
-            util.x_y_bool_array_to_sentence(x[i], y[i], chars, position=i) == util.pad_text(
-                my_dict['text'][0], length=160)[(i*step):(i*step)+w+1]
+                # check dimensions are as expected
+                assert x.shape[1] == w  # indexes over position in the window
+                assert x.shape[2] == len(chars)  # indexes over one-hot encoding
+                assert y.shape[0] == x.shape[0]
+                assert y.shape[1] == len(chars)
+
+                # check number of examples per tweet is given by math.ceil((length - window_size)/step)
+                assert x.shape[0] == math.ceil((t - w) / s) * 2
+
+                # check one-hot encoding decodes again
+                for i in range(5):
+                    util.x_y_bool_array_to_sentence(x[i], y[i], chars, position=i) == util.pad_text(
+                        my_dict['text'][0], length=160)[(i*s):(i*s)+w+1]
+
+
+def test_convert_tweet_to_xy_generator():
+    """ test the generator function """
+
+    my_dict = {'text':
+               ["red and yellow and pink and green, orange and purple and blue, I can sing a rainbow, sing a rainbow, sing a rainbow too",
+                "sweet dreams are made of this, who am I to disagree, travel the world and the even seas, every body's looking for someone"],
+               'emoji':
+               [":rainbow:",
+                ":gay_pride_flag:"]}
+
+    truncate_length = [90, 135, 160, 200]  # 160
+    window_size = [10, 37, 40, 55]
+    step = [2, 3, 5, 7]  # 3
+    chars, _ = util.get_universal_chars_list()
+
+    for t in truncate_length:
+        for w in window_size:
+            for s in step:
+
+                my_data = pd.DataFrame(my_dict)
+                my_generator = util.convert_tweet_to_xy_generator(my_data,
+                                                                  length=t,
+                                                                  window_size=w,
+                                                                  step=s,
+                                                                  batch_size=1)
+
+                for i in range(len(my_data)):
+                    (x, y) = next(my_generator)
+
+                    # check dimensions are as expected
+                    assert x.shape[0] == math.ceil((t - w) / s) * 1
+                    assert x.shape[1] == w  # indexes over position in the window
+                    assert x.shape[2] == len(chars)  # indexes over one-hot encoding
+                    assert y.shape[0] == math.ceil((t - w) / s) * 1
+                    assert y.shape[1] == len(chars)
+
+                    # check number of examples per tweet is given by math.ceil((length - window_size)/step)
+
+                    # check one-hot encoding decodes again
+                    for i in range(5):
+                        util.x_y_bool_array_to_sentence(x[i], y[i], chars, position=i) == util.pad_text(
+                            my_dict['text'][0], length=160)[(i*s):(i*s)+w+1]

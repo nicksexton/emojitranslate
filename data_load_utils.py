@@ -1,11 +1,12 @@
 """ Functions that load downloaded emoji data and prepare train/dev/test sets for NNs """
 
 
+from math import ceil
 import os
 import string
 import pandas as pd
 import numpy as np
-import emoji
+# import emoji
 
 
 CHARACTERS = """ '",.\\/|?:;@'~#[]{}-=_+!"£$%^&*()abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890"""
@@ -212,6 +213,9 @@ def convert_tweet_to_xy(tweet, length=160, window_size=40, step=3):
     for i, nchar in enumerate(y_bool):
         y_arr[i] = nchar
 
+    # temp for profiling
+    del x_bool, y_bool
+
     # finally, reshape into a (m, w, c) array
     # where m is training example, w is window size,
     # c is one-hot encoded character
@@ -220,4 +224,76 @@ def convert_tweet_to_xy(tweet, length=160, window_size=40, step=3):
     # y is a (m, c) array, where m is training example and c is one-hot encoded character
     y_fin = y_arr.reshape(y_arr.shape[0] * y_arr.shape[1], y_arr.shape[2])
 
+    # temp
+    del x_arr, y_arr
+
     return x_fin, y_fin
+
+
+def convert_tweet_to_xy_generator(tweet, length=160, window_size=40, step=3, batch_size=64):
+    """ generator function that batch converts tweets (from pd DataFrame of tweets) to tuple of (x,y) 
+    data, (where x is (m, window_size, character_set_size) ndarray and y is an (m,character_set_size) 
+    dimensional array) suitable for feeding to keras fit_generator.
+    Num training examples per tweet given by math.ceil((length - window_size)/step)"""
+
+    assert length > window_size
+
+    batch_num = 0
+    n_batches = int(tweet.shape[0] / batch_size)  # terminate after last full batch for now
+
+    # calculate num training examples per tweet
+    m_per_tweet = int(ceil((length - window_size) / step))
+
+    # get the universal character set and its index
+    chars_univ, char_idx_univ = get_universal_chars_list()
+
+    # allocate ndarray to contain one-hot encoded batch
+    x_dims = (batch_size,             # num tweets
+              m_per_tweet,
+              window_size,
+              len(chars_univ))        # length of the one-hot vector
+
+    y_dims = (batch_size,             # num tweets
+              m_per_tweet,
+              len(chars_univ))        # length of the one-hot vector
+
+    x_arr = np.zeros(shape=x_dims)
+    y_arr = np.zeros(shape=y_dims)
+
+    while batch_num < n_batches:  # in case tweet < batch_size
+
+        # slice the batch
+        this_batch = tweet.iloc[(batch_num*batch_size):(batch_num+1)*batch_size]
+
+        # expand out all the tweets
+        zipped = this_batch.apply(
+            lambda x: get_series_data_from_tweet(
+                x, length=length, window_size=window_size, step=step),
+            axis=1)
+
+        # unzips the tuples into separate tuples of x, y
+        (x_tuple, y_tuple) = zip(*zipped)
+
+        # turn each tuple into an series and then one-hot encode it
+        x_bool = pd.Series(x_tuple).apply(lambda x: get_x_bool_array(x, chars_univ, char_idx_univ))
+        y_bool = pd.Series(y_tuple).apply(lambda x: get_y_bool_array(x, char_idx_univ))
+
+        # convert it to the ndarray
+        for i, twit in enumerate(x_bool):
+            x_arr[i] = twit
+
+        for i, nchar in enumerate(y_bool):
+            y_arr[i] = nchar
+
+        # finally, reshape into a (m, w, c) array
+        # where m is training example, w is window size,
+        # c is one-hot encoded character
+        x_fin = x_arr.reshape(batch_size * m_per_tweet, window_size, len(chars_univ))
+
+        # y is a (m, c) array, where m is training example and c is one-hot encoded character
+        y_fin = y_arr.reshape(batch_size * m_per_tweet, len(chars_univ))
+
+        batch_num += 1  # do the next batch
+        batch_num = batch_num % n_batches  # loop indefinitely
+
+        yield (x_fin, y_fin)
