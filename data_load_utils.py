@@ -227,3 +227,20 @@ def convert_tweet_to_xy(tweet, length=160, window_size=40, step=3):
     del x_arr, y_arr
 
     return x_fin, y_fin
+
+
+def convert_tweet_to_xy_generator(tweet, length=160, window_size=40, step=3, batch_size=64):
+    """ generator function that batch converts tweets (from pd DataFrame of tweets) to tuple of (x,y) 
+    data, (where x is (m, window_size, character_set_size) ndarray and y is an (m,character_set_size) 
+    dimensional array) suitable for feeding to keras fit_generator.
+    Num training examples per tweet given by math.ceil((length - window_size)/step)"""
+
+    assert length > window_size
+
+    batch_num = 0
+    n_batches = int(tweet.shape[0] / batch_size)  # terminate after last full batch for now
+
+    while True:
+
+        batch_num += 1  # do the next batch
+        batch_num = batch_num % n_batches  # loop indefinitely
