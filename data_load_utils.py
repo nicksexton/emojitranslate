@@ -28,7 +28,7 @@ def filter_tweets_min_count(tweets, min_count=1000):
 
 def filter_text_for_handles(text, chars=CHARACTERS):
     """ takes an pd.Series of text, removes twitter handles from
-    text data - all text preceded by @ and then all characters not contained in 
+    text data - all text preceded by @ and then all characters not contained in
     universal set"""
 
     def filter_handles(txt): return ' '.join(
@@ -70,6 +70,27 @@ def get_series_data_from_tweet(tweet, length=160, window_size=40, step=3):
     return (sentences, next_chars)
 
 
+def get_emoji_and_series_data_from_tweet(tweet, length=160, window_size=40, step=3):
+    """ input (tweet) is a pd.Series, a row of a pd.DataFrame
+    returns corresponding lists sentences (of length window_size),
+    emoji and next_chars (both single characters). """
+
+    sentences = []
+    next_chars = []
+    emoji = []
+
+    # pad all tweets to 160 characters
+    # padded_text = ' ' * (160-tweet_length) + tweet['text']
+    padded_text = pad_text(tweet['text'], length=length)
+
+    for i in range(0, length - window_size, step):
+        sentences.append(padded_text[i:i+window_size])
+        next_chars.append(padded_text[i+window_size])
+        emoji.append(tweet['emoji'])
+
+    return (sentences, emoji, next_chars)
+
+
 def get_unique_chars_list(list_strings):
     """ takes list of strings, returns dict of all characters """
 
@@ -80,6 +101,13 @@ def get_unique_chars_list(list_strings):
     char_indices = dict((char, chars.index(char)) for char in chars)
 
     return chars, char_indices
+
+
+def get_emojis_list(emoji_pandas_series):
+    """ Gets a sorted list of unique emojis, and a dictionary of inverses"""
+    emojis = sorted(list(set(emoji_pandas_series)))
+    emoji_indices = dict((emoji, emojis.index(emoji)) for emoji in emojis)
+    return emojis, emoji_indices
 
 
 def get_universal_chars_list():
@@ -143,6 +171,18 @@ def get_y_bool_array(next_chars, char_index):
     return np.asarray(text_y)
 
 
+def get_emoji_bool_array(emoji, emoji_index):
+    """ gets the one-hot encoded array for emojis, exactly like get_y_bool_array"""
+
+    #emoji_one_hot = np.zeros((1, len(emoji_index)), dtype=np.bool)
+    #emoji_one_hot[0, emoji_index[emoji]] = 1
+    emoji_one_hot = np.zeros((len(emoji), len(emoji_index)), dtype=np.bool)
+    for i in range(len(emoji)):
+        emoji_one_hot[i, emoji_index[emoji[i]]] = 1
+
+    return np.asarray(emoji_one_hot)
+
+
 def x_y_bool_array_to_sentence(text_x, text_y, chars, position=0, separator=False):
     """ converts one-hot encoded arrays text_x, text_y back to human
     readable, for debug purposes """
@@ -171,7 +211,7 @@ def x_y_bool_array_to_sentence(text_x, text_y, chars, position=0, separator=Fals
 def convert_tweet_to_xy(tweet, length=160, window_size=40, step=3):
     """ converts a tweet (pd DataFrame with 'text' field) to x, y text pairs, where x is
     window_size character moving window over the text, and y is the expected next character.
-    outputs an ndarray of dims (m, window_size, characters) where m is the final number of 
+    outputs an ndarray of dims (m, window_size, characters) where m is the final number of
     training examples and characters is the number of characters in the set (78 by default) """
 
     # apply the function to split each tweet into multiple windows of 40 chars and
@@ -230,10 +270,13 @@ def convert_tweet_to_xy(tweet, length=160, window_size=40, step=3):
     return x_fin, y_fin
 
 
-def convert_tweet_to_xy_generator(tweet, length=160, window_size=40, step=3, batch_size=64):
-    """ generator function that batch converts tweets (from pd DataFrame of tweets) to tuple of (x,y) 
-    data, (where x is (m, window_size, character_set_size) ndarray and y is an (m,character_set_size) 
+def convert_tweet_to_xy_generator(tweet, length=160, window_size=40,
+                                  step=3, batch_size=64, emoji_set=None):
+    """ generator function that batch converts tweets (from pd DataFrame of tweets) to tuple of (x,y)
+    data, (where x is (m, window_size, character_set_size) ndarray and y is an (m,character_set_size)
     dimensional array) suitable for feeding to keras fit_generator.
+    If set of all emojis is passed in as emoji_set, then the x return
+    value is a list containing m,emoji_size matrix as well as the text.
     Num training examples per tweet given by math.ceil((length - window_size)/step)"""
 
     assert length > window_size
@@ -246,6 +289,8 @@ def convert_tweet_to_xy_generator(tweet, length=160, window_size=40, step=3, bat
 
     # get the universal character set and its index
     chars_univ, char_idx_univ = get_universal_chars_list()
+    if emoji_set:
+        emoji_idx = dict((emoji, emoji_set.index(emoji)) for emoji in emoji_set)
 
     # allocate ndarray to contain one-hot encoded batch
     x_dims = (batch_size,             # num tweets
@@ -260,19 +305,35 @@ def convert_tweet_to_xy_generator(tweet, length=160, window_size=40, step=3, bat
     x_arr = np.zeros(shape=x_dims)
     y_arr = np.zeros(shape=y_dims)
 
+    if emoji_set:
+        emoji_dims = (batch_size,
+                      m_per_tweet,
+                      len(emoji_set))
+        emoji_arr = np.zeros(shape=emoji_dims)
+
     while batch_num < n_batches:  # in case tweet < batch_size
 
         # slice the batch
         this_batch = tweet.iloc[(batch_num*batch_size):(batch_num+1)*batch_size]
 
         # expand out all the tweets
-        zipped = this_batch.apply(
-            lambda x: get_series_data_from_tweet(
-                x, length=length, window_size=window_size, step=step),
-            axis=1)
+        if emoji_set:
+            zipped = this_batch.apply(
+                lambda x: get_emoji_and_series_data_from_tweet(
+                    x, length=length, window_size=window_size, step=step),
+                axis=1)
 
-        # unzips the tuples into separate tuples of x, y
-        (x_tuple, y_tuple) = zip(*zipped)
+            # unzips the tuples into separate tuples of x, y
+            (x_tuple, emoji_tuple, y_tuple) = zip(*zipped)
+
+        else:
+            zipped = this_batch.apply(
+                lambda x: get_series_data_from_tweet(
+                    x, length=length, window_size=window_size, step=step),
+                axis=1)
+
+            # unzips the tuples into separate tuples of x, y
+            (x_tuple, y_tuple) = zip(*zipped)
 
         # turn each tuple into an series and then one-hot encode it
         x_bool = pd.Series(x_tuple).apply(lambda x: get_x_bool_array(x, chars_univ, char_idx_univ))
@@ -292,6 +353,18 @@ def convert_tweet_to_xy_generator(tweet, length=160, window_size=40, step=3, bat
 
         # y is a (m, c) array, where m is training example and c is one-hot encoded character
         y_fin = y_arr.reshape(batch_size * m_per_tweet, len(chars_univ))
+
+        my_var = 'conditional_before'
+
+        if emoji_set:
+            emoji_bool = pd.Series(emoji_tuple).apply(lambda x: get_emoji_bool_array(x, emoji_idx))
+
+            for i, emoj in enumerate(emoji_bool):
+                emoji_arr[i] = emoj
+
+            my_var = 'conditional_true'
+            emoji_fin = emoji_arr.reshape(batch_size * m_per_tweet, len(emoji_set))
+            x_fin = [x_fin, emoji_fin]
 
         batch_num += 1  # do the next batch
         batch_num = batch_num % n_batches  # loop indefinitely
