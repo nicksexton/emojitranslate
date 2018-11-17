@@ -6,6 +6,16 @@ import pandas as pd
 import data_load_utils as util
 
 
+def test_read_tweet_data_filters_headers():
+    """ filter out column headers (rows where text='text' and emoji='emoji') """
+    tweets = util.read_tweet_data('data/emojis_homemade.csv')
+    assert tweets.shape[0] > 0  # check tweets dataframe created
+
+    # run the filter again, check there's no hits
+    filt = tweets['emoji'] == 'emoji'
+    assert filt.any(axis=0) == False
+
+
 def test_filter_text_for_handles_does_what_it_says():
     """ check filters both handles and chars """
     sample_series = pd.Series(

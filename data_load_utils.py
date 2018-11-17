@@ -15,9 +15,13 @@ CHARACTERS = """ '",.\\/|?:;@'~#[]{}-=_+!"£$%^&*()abcdefghijklmnopqrstuvwxyzABC
 def read_tweet_data(path):
     """" loads the csv (path) containing text and emoji data
     returns a pandas dataframe containing line number, text, and emoji """
-    data = pd.read_csv(path)
+    data = pd.read_csv(path, dtype='object')
     data = data.loc[:, ['text', 'emoji']]  # should contain two labelled columns
-    return data
+
+    # filter out comumn headers (rows where text='text' emoji='emoji')
+    filt = data['emoji'] != 'emoji'
+
+    return data[filt]
 
 
 def filter_tweets_min_count(tweets, min_count=1000):
