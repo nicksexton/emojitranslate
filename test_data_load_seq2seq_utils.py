@@ -75,7 +75,7 @@ def test_emoji_gen():
 
     gen = s2s_util.xy_generator(my_data_repeat, emoji_indices=emoji_idx)
 
-    (x, y, emoj) = gen.__next__()
+    (emoj, x, y) = gen.__next__()
     # check emoji array has the right batch size:
     assert emoj.shape[0] == 64
 
